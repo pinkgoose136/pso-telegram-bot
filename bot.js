@@ -12,8 +12,7 @@ const CHECK_INTERVAL =
     Number(process.env.CHECK_INTERVAL || 30) * 1000;
 
 const STATE_FILE = "./state.json";
-const BINANCE_API = "https://api.binance.com";
-
+const BINANCE_API = "https://data-api.binance.vision";
 
 // ======================================================
 // STATE

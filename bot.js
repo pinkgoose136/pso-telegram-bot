@@ -1,6 +1,7 @@
 require("dotenv").config();
 const fs = require("fs");
 
+
 // ======================================================
 // CONFIG
 // ======================================================
@@ -73,7 +74,17 @@ function defaultState() {
         lastPso: {},
 
         // последняя обработанная закрытая 5m свеча
-        last5mCandle: {}
+        last5mCandle: {},
+
+        // последний ОТПРАВЛЕННЫЙ тип сигнала
+        // для каждой монеты:
+        //
+        // upper = последний был красный
+        // lower = последний был зелёный
+        //
+        // Повторный сигнал того же типа игнорируется,
+        // пока не появится противоположный.
+        lastSignal: {}
     };
 }
 
@@ -103,7 +114,10 @@ function loadState() {
                 saved.lastPso || {},
 
             last5mCandle:
-                saved.last5mCandle || {}
+                saved.last5mCandle || {},
+
+            lastSignal:
+                saved.lastSignal || {}
         };
 
     } catch (err) {
@@ -332,7 +346,6 @@ function getHourStart(timestamp) {
         ) * HOUR
     );
 }
-
 
 function aggregate5mTo1h(
     candles5m
@@ -665,7 +678,6 @@ async function createReport(title) {
     return lines.join("\n");
 }
 
-
 async function sendStartupReport() {
     const report =
         await createReport(
@@ -676,7 +688,6 @@ async function sendStartupReport() {
         report
     );
 }
-
 
 async function sendManualReport() {
     const report =
@@ -734,7 +745,9 @@ async function checkSymbol(coin) {
             ? formatPSO(
                 previousSeen
             )
-            : "none"
+            : "none",
+        "last signal:",
+        state.lastSignal[coin] || "none"
     );
 
 
@@ -760,7 +773,7 @@ async function checkSymbol(coin) {
         now <= -SIGNAL_LEVEL;
 
 
-    // Сначала сохраняем новое состояние
+    // Сначала сохраняем новое состояние PSO
     state.lastPso[coin] =
         now;
 
@@ -772,9 +785,23 @@ async function checkSymbol(coin) {
 
     // ==========================================
     // UPPER
+    //
+    // Если последний ОТПРАВЛЕННЫЙ сигнал уже
+    // был верхним — новый верхний игнорируем.
+    //
+    // Новый красный разрешается только после
+    // того, как был отправлен зелёный.
     // ==========================================
 
-    if (upperSignal) {
+    if (
+        upperSignal &&
+        state.lastSignal[coin] !== "upper"
+    ) {
+        state.lastSignal[coin] =
+            "upper";
+
+        saveState();
+
         await sendTelegram(
             `🔴 <b>${coin}</b>\n\n` +
             `<b>1H PSO вошёл в верхнюю зону</b>\n\n` +
@@ -798,9 +825,23 @@ async function checkSymbol(coin) {
 
     // ==========================================
     // LOWER
+    //
+    // Если последний ОТПРАВЛЕННЫЙ сигнал уже
+    // был нижним — новый нижний игнорируем.
+    //
+    // Новый зелёный разрешается только после
+    // того, как был отправлен красный.
     // ==========================================
 
-    if (lowerSignal) {
+    if (
+        lowerSignal &&
+        state.lastSignal[coin] !== "lower"
+    ) {
+        state.lastSignal[coin] =
+            "lower";
+
+        saveState();
+
         await sendTelegram(
             `🟢 <b>${coin}</b>\n\n` +
             `<b>1H PSO вошёл в нижнюю зону</b>\n\n` +
@@ -1106,6 +1147,24 @@ async function processTelegramMessage(
                 )
             ) {
                 delete state.last5mCandle[
+                    coin
+                ];
+            }
+        }
+
+
+        for (
+            const coin
+            of Object.keys(
+                state.lastSignal
+            )
+        ) {
+            if (
+                !valid.includes(
+                    coin
+                )
+            ) {
+                delete state.lastSignal[
                     coin
                 ];
             }

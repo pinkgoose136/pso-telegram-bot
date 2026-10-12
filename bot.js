@@ -359,12 +359,12 @@ async function checkSymbol(coin) {
         "last signal:",
         state.lastSignal[coin] || "none"
     );
+    
+    // Красный: PSO вошёл в верхнюю зону +0.9.
+    const upperSignal = previousSeen !== undefined && previousSeen < SIGNAL_LEVEL && now >= SIGNAL_LEVEL;
 
-    // Красный: PSO вышел из верхней зоны, опустившись ниже +0.9.
-    const upperSignal = previousSeen !== undefined && previousSeen >= SIGNAL_LEVEL && now < SIGNAL_LEVEL;
-
-    // Зелёный: PSO вышел из нижней зоны, поднявшись выше -0.9.
-    const lowerSignal = previousSeen !== undefined && previousSeen <= -SIGNAL_LEVEL && now > -SIGNAL_LEVEL;
+    // Зелёный: PSO вошёл в нижнюю зону -0.9.
+    const lowerSignal = previousSeen !== undefined && previousSeen > -SIGNAL_LEVEL && now <= -SIGNAL_LEVEL;
 
     state.lastPso[coin] = now;
     state.last5mCandle[coin] = candle5m;
